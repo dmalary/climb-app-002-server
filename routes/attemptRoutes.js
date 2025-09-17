@@ -1,5 +1,5 @@
 import express from'express';
-import { getAllAttempts } from '../controllers/attemptsController.js'
+import { getAllAttempts } from '../controllers/attemptController.js'
 
 const router = express.Router();
 

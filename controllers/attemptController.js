@@ -1,9 +1,9 @@
 import { supabase } from "../config/supabaseClient.js";
 
 // GET all users
-export const getAllUsers = async (req, res) => {
+export const getAllAttempts = async (req, res) => {
   try {
-    const { data, error } = await supabase.from("users").select("*");
+    const { data, error } = await supabase.from("attempts").select("*");
 
     if (error) throw error;
 
