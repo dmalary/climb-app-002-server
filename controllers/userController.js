@@ -36,21 +36,6 @@ export const getUser = async (req, res) => {
   }
 }
 
-
-
-// app.get('/api/users{:id}', (req, res) => { // optional param
-
-// app.get('/api/users/:id', (req, res) => {
-//   const userId = parseInt(req.params.id);
-//   const user = db.users.find(u => u.userId === userId);
-
-//   if (user) {
-//     res.status(200).json(user);
-//   } else {
-//     res.status(404).json({ message: 'User not found' });
-//   }
-// });
-
 // Define a POST route to add a new user
 // app.post('/api/users', (req, res) => {
 //   const newUser = req.body;
