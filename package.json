@@ -1,7 +1,8 @@
 {
   "type": "module",
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.4",
+    "@clerk/express": "^1.7.31",
+    "@supabase/supabase-js": "^2.75.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
     "nodemon": "^3.1.10",
