@@ -3,7 +3,18 @@ import { createClient } from "@supabase/supabase-js";
 
 dotenv.config()
 
-export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+export const supabase = createClient(supabaseUrl, supabaseKey);
+
+export const createClerkSupabaseClient = function(clerkSupaSession) {
+  createClient(
+    supabaseUrl, supabaseKey,
+    {
+      async accessToken() {
+        return clerkSupaSession?.getToken() ?? null
+      }
+    }
+  );
+};
