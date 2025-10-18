@@ -50,7 +50,7 @@ export const getUserSessions = async (req, res) => {
       .from("sessions")
       .select("*")
       .eq("user_id", userId) // user_id must match Clerk userId
-      .order("created_at", { ascending: false });
+      .order("date", { ascending: false });
 
     if (error) {
       console.error("Supabase error:", error);
