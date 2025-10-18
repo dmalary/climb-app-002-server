@@ -3,7 +3,8 @@ import { getAllSessions, getUserSessions } from '../controllers/sessionControlle
 
 const router = express.Router();
 
-router.get('/', getAllSessions)
-router.get('/:userId', getUserSessions)
+// router.get('/', getAllSessions)
+// router.get('/:userId', getUserSessions)
+router.get('/', getUserSessions)
 
 export default router;
