@@ -1,4 +1,5 @@
 import { supabase } from "../supabaseClient.js";
+import { seedMockData } from "../../lib/mockSeed.js"
 
 export const syncUser = async (req, res, next) => {
   try {
@@ -47,6 +48,8 @@ export const syncUser = async (req, res, next) => {
         return res.status(500).json({ error: "Could not create user" });
       }
       existingUser = newUser;
+
+      await seedMockData(userId, supabase);
     }
 
     req.user = existingUser;
