@@ -10,7 +10,7 @@ import { syncUser } from './config/middleware/auth.js';
 const app = express();
 
 // app.use(cors());
-app.use(cors({ origin: process.env.PORT, credentials: true }));
+app.use(cors({ origin: process.env.NEXT_URL, credentials: true }));
 app.use(express.json());
 app.use(clerkMiddleware());
 
