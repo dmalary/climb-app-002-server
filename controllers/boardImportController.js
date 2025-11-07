@@ -1,10 +1,12 @@
-import axios from "axios";
-import { createClient } from "@supabase/supabase-js";
+// import axios from "axios";
+import { fetchUserData } from "../config/boardService.js";
+import { supabase } from "../config/supabaseClient.js"; // uncomment client items below if this doesn't work
+// import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.PUBLIC_SUPABASE_URL, 
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// const supabase = createClient(
+//   process.env.PUBLIC_SUPABASE_URL, 
+//   process.env.SUPABASE_SERVICE_ROLE_KEY
+// );
 
 export const getBoardData = async (req, res) => {
   try {
@@ -21,25 +23,29 @@ export const getBoardData = async (req, res) => {
     // console.log('username', username)
     // ====================
 
+    // can i move this url logic + step 1 to board service?
     // Construct target URL safely
-    const PY_LIB_URL = process.env.PY_LIB_URL;
-    if (!PY_LIB_URL) {
-      throw new Error("PY_LIB_URL not set in environment");
-    }
+    // const PY_LIB_URL = process.env.PY_LIB_URL;
+    // if (!PY_LIB_URL) {
+    //   throw new Error("PY_LIB_URL not set in environment");
+    // }
 
     // --- Step 1: Fetch data from Python service ---
-    const pyRes = await axios.post(`${PY_LIB_URL}/fetch-board-data`, {
-      board,
-      token,
-      username,
-      password,
-    });
+    // const pyRes = await axios.post(`${PY_LIB_URL}/fetch-board-data`, {
+    //   board,
+    //   token,
+    //   username,
+    //   password,
+    // });
+
+    const userBoardData = await fetchUserData(board, token, username, password);
 
     // if (!pythonRes.data) {
     //   throw new Error("Invalid response from Python service");
     // }
 
-    const pyData = Array.isArray(pyRes.data) ? pyRes.data[0] : pyRes.data;
+    // const pyData = Array.isArray(pyRes.data) ? pyRes.data[0] : pyRes.data;
+    const pyData = Array.isArray(userBoardData.data) ? userBoardData.data[0] : userBoardData.data;
     const sessions = pyData?.data ?? [];
 
     if (!Array.isArray(sessions) || sessions.length === 0) {
@@ -91,27 +97,27 @@ export const getBoardData = async (req, res) => {
       if (!sessionId) continue;
 
       for (const c of s.climbs ?? []) {
-        // 1️⃣ Insert climb
-        const { data: climbData, error: climbError } = await supabase
-          .from("climbs")
-          .insert([
-            {
-              board_id: boardId,
-              climb_name: c.climb_uuid ?? "Unknown",
-              angle: c.angle ?? null,
-              displayed_grade: null,
-              difficulty: c.difficulty ?? null,
-              is_benchmark: c.is_benchmark ?? false,
-            },
-          ])
-          .select("id")
-          .single();
+        // 1️⃣ Insert climb - no this will be in the publicsyncController
+        // const { data: climbData, error: climbError } = await supabase
+        //   .from("climbs")
+        //   .insert([
+        //     {
+        //       board_id: boardId,
+        //       climb_name: c.climb_uuid ?? "Unknown",
+        //       angle: c.angle ?? null,
+        //       displayed_grade: null,
+        //       difficulty: c.difficulty ?? null,
+        //       is_benchmark: c.is_benchmark ?? false,
+        //     },
+        //   ])
+        //   .select("id")
+        //   .single();
 
-        if (climbError) {
-          console.error("Climb insert error:", climbError.message);
-          continue;
-        }
-        climbCount++;
+        // if (climbError) {
+        //   console.error("Climb insert error:", climbError.message);
+        //   continue;
+        // }
+        // climbCount++;
 
         // 2️⃣ Insert attempt (each climb = 1 attempt)
         const { error: attemptError } = await supabase.from("attempts").insert([
@@ -144,54 +150,6 @@ export const getBoardData = async (req, res) => {
       inserted_attempts: attemptCount,
     });
 
-    // console.log(
-    //   pythonRes.data.data, pythonRes.data,
-    //  )
-    // const sessions = pythonRes.data.data ?? pythonRes.data;
-    // console.log("Fetched board data:", sessions.length);
-    
-    // --- Step 2: Prepare data for DB insert ---
-    // Example shape: flatten climbs across sessions
-    // const climbs = Array.isArray(sessions)
-    //   ? sessions.flatMap((s) =>
-    //       s.climbs?.map((c) => ({
-    //         user_id: userId,
-    //         session_id: s.session_id,
-    //         board_name: s.board,
-    //         date: s.date,
-    //         climb_name: c.climb_name,
-    //         difficulty: c.difficulty,
-    //         attempts: c.attempts,
-    //       }))
-    //     )
-    //   : [];
-
-
-    // // --- Step 3: Insert into Supabase ---
-    // let insertedCount = 0;
-    // if (climbs.length > 0) {
-    //   const { data, error } = await supabase.from("sessions").insert(climbs);
-    //   if (error) {
-    //     console.error("Supabase insert error:", error);
-    //     return res.status(500).json({ error: "Failed to insert into Supabase", details: error.message });
-    //   }
-    //   insertedCount = data?.length || climbs.length;
-    // }
-
-    // --- Step 4: Respond to client ---
-    // res.status(200).json({
-    //   message: `Board data fetched successfully. ${insertedCount} climbs inserted.`,
-    //   board,
-    //   total_sessions: sessions?.length || 0,
-    //   inserted_climbs: insertedCount,
-    // });
-
-    // // In production: insert/transform data here (e.g. Supabase)
-    // res.status(200).json({
-    //   message: "Board data fetched successfully",
-    //   board,
-    //   data: pythonRes.data.data ?? pythonRes.data,
-    // });
   } catch (err) {
     console.error("Python service error:", err.message);
 
