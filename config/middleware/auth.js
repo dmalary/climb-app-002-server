@@ -14,6 +14,9 @@ export const syncUser = async (req, res, next) => {
     // Basic user data from Clerk
     const email = sessionClaims?.email || "";
     const username = sessionClaims?.username || "";
+    const safeUsername = username && username.trim() !== ""
+      ? username
+      : `user_${userId.slice(0, 6)}`;
 
     // check supabase for user
     let { data: existingUser, error: findErr } = await supabase
@@ -30,26 +33,35 @@ export const syncUser = async (req, res, next) => {
     }
 
     if (!existingUser) {
-      const { data: newUser, error: insertErr } = await supabase
+      const { data: newUser, error: upsertErr } = await supabase
         .from("users")
         // .insert({ clerk_id: userId })
         // .insert({ id: userId })
-        .insert({
-          id: userId,
-          email,
-          username,
-          created_at: new Date().toISOString()
-        })
+        // .insert({
+        //   id: userId,
+        //   email,
+        //   username,
+        //   created_at: new Date().toISOString()
+        // })
+        .upsert({
+            id: userId,
+            email,
+            // username: username || `user_${userId.slice(0, 6)}`,
+            username: safeUsername,
+            created_at: new Date().toISOString(),
+          },
+          { onConflict: "id" }   // ✅ ensures it overwrites based on id, not username
+        )
         .select("*")
         .single();
 
-      if (insertErr) {
-        console.error("Supabase insert user error:", insertErr);
+      if (upsertErr) {
+        console.error("Supabase upsert user error:", upsertErr);
         return res.status(500).json({ error: "Could not create user" });
       }
       existingUser = newUser;
 
-      await seedMockData(userId, supabase);
+      // await seedMockData(userId, supabase);
     }
 
     req.user = existingUser;

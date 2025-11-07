@@ -57,7 +57,7 @@ export const getUserSessions = async (req, res) => {
       return res.status(500).json({ error: "Error fetching sessions" });
     }
 
-    return res.status(200).json(data);
+    return res.status(200).json(data || []);
   } catch (err) {
     console.error("Error fetching sessions:", err.message);
     return res.status(500).json({ error: "Internal server error" });
