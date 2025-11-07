@@ -5,6 +5,7 @@ import climbRoutes from './climbRoutes.js';
 import sessionRoutes from './sessionRoutes.js';
 import attemptRoutes from './attemptRoutes.js';
 import importRoutes from './boardImportRoutes.js';
+import publicSyncRoutes from './publicSyncRoutes.js';
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.use('/sessions', sessionRoutes);
 router.use('/attempts', attemptRoutes);
 // router.use('/follows', followRoutes);
 router.use('/import-board', importRoutes)
+router.use('/public-sync', publicSyncRoutes)
 
 export default router;
 
