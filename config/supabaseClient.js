@@ -4,10 +4,12 @@ import { createClient } from "@supabase/supabase-js";
 dotenv.config()
 
 const supabaseUrl = process.env.PUBLIC_SUPABASE_URL;
-// const supabaseKey = process.env.PUBLIC_SUPABASE_ANON_KEY;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-// export const supabase = createClient(supabaseUrl, supabaseKey);
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error("Supabase URL or Service Role Key not set in environment variables");
+}
+
 export const supabase = createClient(supabaseUrl, supabaseKey, 
   {
     auth: {
@@ -16,14 +18,3 @@ export const supabase = createClient(supabaseUrl, supabaseKey,
     }
   }
 );
-
-// export const createClerkSupabaseClient = function(clerkSupaSession) {
-//   createClient(
-//     supabaseUrl, supabaseKey,
-//     {
-//       async accessToken() {
-//         return clerkSupaSession?.getToken() ?? null
-//       }
-//     }
-//   );
-// };
