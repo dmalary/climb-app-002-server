@@ -1,4 +1,4 @@
-// import axios from "axios";
+import axios from "axios";
 import { supabase } from "../config/supabaseClient.js";
 import { fetchPublicData } from "../config/boardService.js";
 // import { createClient } from "@supabase/supabase-js";
@@ -9,15 +9,33 @@ import { fetchPublicData } from "../config/boardService.js";
 // );
 
 export const getPublicData = async (req, res) => {
+  console.log("🛰️ Express: /api/sync-public hit");
+
   const { board } = req.body;
+  console.log(`🚀 Starting public sync for board: ${board}`);
 
   if (!board) return res.status(400).json({ error: "Missing board name" });
 
   try {
     // 1️⃣ Fetch climbs from FastAPI board service
-    const publicBoardData = await fetchPublicData(board);
-    console.log(`🧭 FastAPI returned. Count:${publicBoardData?.count}, Sample:${publicBoardData?.sample}`);
-    const climbs = publicBoardData?.climbs || publicBoardData?.data?.[0]?.climbs || [];
+    // const publicBoardData = await fetchPublicData(board);
+    const PY_LIB_URL = process.env.PY_LIB_URL;
+    if (!PY_LIB_URL) {
+      throw new Error("PY_LIB_URL not set in environment");
+    }
+
+    const pyRes = await axios.post(`${PY_LIB_URL}/sync-public-data`, {
+      // params: { board },
+      board
+    });
+
+    // console.log(`🧭 FastAPI returned. Count:${publicBoardData?.count}, Sample:${publicBoardData?.sample}`);
+    // const climbs = publicBoardData?.climbs || publicBoardData?.data?.[0]?.climbs || [];
+    // console.log(`🧭 FastAPI returned. Count:${pyRes?.count}, Sample:${pyRes?.sample}`);
+    console.log(`🧭 FastAPI returned. Count:${pyRes?.data?.count}, Sample:${pyRes?.data?.sample}`);
+
+    // const climbs = pyRes?.climbs || pyRes?.data?.[0]?.climbs || [];
+    const climbs = pyRes?.data?.climbs || pyRes?.data?.data?.[0]?.climbs || [];
 
     if (!climbs.length) {
       return res.status(404).json({ error: "No climbs found from board service" });

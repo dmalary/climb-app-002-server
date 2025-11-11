@@ -5,6 +5,7 @@ import express from'express';
 import cors from "cors";
 import { clerkMiddleware, requireAuth } from '@clerk/express';
 import mainRouter from './routes/index.js';
+import publicSyncRoutes from './routes/publicSyncRoutes.js';
 import { syncUser } from './config/middleware/auth.js';
 
 const app = express();
@@ -14,6 +15,8 @@ app.use(cors({ origin: process.env.NEXT_URL, credentials: true }));
 app.use(express.json());
 app.use(clerkMiddleware());
 
+// public data sync
+app.use('/api', publicSyncRoutes);
 
 // app.use('/api', requireAuth(), mainRouter);
 // app.use('/api', mainRouter);
