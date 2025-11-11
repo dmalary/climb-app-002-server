@@ -1,7 +1,7 @@
-// import axios from "axios";
-import { fetchUserData } from "../config/boardService.js";
+import axios from "axios";
 import { supabase } from "../config/supabaseClient.js"; // uncomment client items below if this doesn't work
-// import { createClient } from "@supabase/supabase-js";
+import { fetchUserData } from "../config/boardService.js";
+import { createClient } from "@supabase/supabase-js";
 
 // const supabase = createClient(
 //   process.env.PUBLIC_SUPABASE_URL, 
@@ -9,6 +9,8 @@ import { supabase } from "../config/supabaseClient.js"; // uncomment client item
 // );
 
 export const getBoardData = async (req, res) => {
+  console.log("🛰️ Express: /api/import-board hit");
+
   try {
     const { board, token, username, password } = req.body;
 
@@ -25,27 +27,27 @@ export const getBoardData = async (req, res) => {
 
     // can i move this url logic + step 1 to board service?
     // Construct target URL safely
-    // const PY_LIB_URL = process.env.PY_LIB_URL;
-    // if (!PY_LIB_URL) {
-    //   throw new Error("PY_LIB_URL not set in environment");
-    // }
+    const PY_LIB_URL = process.env.PY_LIB_URL;
+    if (!PY_LIB_URL) {
+      throw new Error("PY_LIB_URL not set in environment");
+    }
 
     // --- Step 1: Fetch data from Python service ---
-    // const pyRes = await axios.post(`${PY_LIB_URL}/fetch-board-data`, {
-    //   board,
-    //   token,
-    //   username,
-    //   password,
-    // });
+    const pyRes = await axios.post(`${PY_LIB_URL}/fetch-board-data`, {
+      board,
+      token,
+      username,
+      password,
+    });
 
-    const userBoardData = await fetchUserData(board, token, username, password);
+    // const userBoardData = await fetchUserData(board, token, username, password);
 
-    // if (!pythonRes.data) {
-    //   throw new Error("Invalid response from Python service");
-    // }
+    if (!pyRes.data) {
+      throw new Error("Invalid response from Python service");
+    }
 
-    // const pyData = Array.isArray(pyRes.data) ? pyRes.data[0] : pyRes.data;
-    const pyData = Array.isArray(userBoardData.data) ? userBoardData.data[0] : userBoardData.data;
+    const pyData = Array.isArray(pyRes.data) ? pyRes.data[0] : pyRes.data;
+    // const pyData = Array.isArray(userBoardData.data) ? userBoardData.data[0] : userBoardData.data;
     const sessions = pyData?.data ?? [];
 
     if (!Array.isArray(sessions) || sessions.length === 0) {
@@ -123,7 +125,8 @@ export const getBoardData = async (req, res) => {
         const { error: attemptError } = await supabase.from("attempts").insert([
           {
             session_id: sessionId,
-            climb_id: climbData.id,
+            // climb_id: climbData.id,
+            climb_id: c.climb_uuid ?? "Unknown",
             tries: c.bid_count ?? 1,
             is_repeat: false,
             is_ascent: c.quality > 0, // crude ascent flag
