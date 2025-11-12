@@ -28,34 +28,40 @@ export const getPublicData = async (req, res) => {
       // params: { board },
       board
     });
-
+    const data = pyRes.data;
     // console.log(`🧭 FastAPI returned. Count:${publicBoardData?.count}, Sample:${publicBoardData?.sample}`);
     // const climbs = publicBoardData?.climbs || publicBoardData?.data?.[0]?.climbs || [];
     // console.log(`🧭 FastAPI returned. Count:${pyRes?.count}, Sample:${pyRes?.sample}`);
-    console.log(`🧭 FastAPI returned. Count:${pyRes?.data?.count}, Sample:${pyRes?.data?.sample}`);
+    // console.log(`🧭 FastAPI returned. Count:${pyRes?.data?.count}, Sample:${pyRes?.data?.sample}`);
+    console.log("🧭 FastAPI returned keys:", Object.keys(data));
+    console.log(`🧭 FastAPI returned climb_count: ${data.climb_count}, Sample: ${JSON.stringify(data.sample?.[0], null, 2)}`);
+
 
     // const climbs = pyRes?.climbs || pyRes?.data?.[0]?.climbs || [];
-    const climbs = pyRes?.data?.climbs || pyRes?.data?.data?.[0]?.climbs || [];
+    // const climbs = pyRes?.data?.climbs || pyRes?.data?.data?.[0]?.climbs || [];
+    const climbs = data.climbs || [];
 
     if (!climbs.length) {
       return res.status(404).json({ error: "No climbs found from board service" });
     }
 
     // 2️⃣ Ensure board exists in Supabase
-    let { data: boards } = await supabase
+    let { data: boardData,  error: boardFetchError } = await supabase
       .from("boards")
       .select("id")
       .eq("name", board)
       .single();
 
-    let boardId = boards?.id;
+    if (boardFetchError && boardFetchError.code !== "PGRST116") throw boardFetchError;
+
+    let boardId = boardData?.id;
     if (!boardId) {
-      const { data: newBoard, error } = await supabase
+      const { data: newBoard, insertError } = await supabase
         .from("boards")
         .insert({ name: board })
         .select("id")
         .single();
-      if (error) throw error;
+      if (insertError) throw insertError;
       boardId = newBoard.id;
     }
 
@@ -63,6 +69,7 @@ export const getPublicData = async (req, res) => {
     const mappedClimbs = climbs.map((c) => ({
       board_id: boardId,
       climb_name: c.climb_name || c.name || "Unnamed climb",
+      // update db to add climbID from py res?
       angle: c.angle || null,
       displayed_grade: c.displayed_grade || c.grade || null,
       difficulty: c.difficulty || null,
@@ -72,15 +79,16 @@ export const getPublicData = async (req, res) => {
     // 4️⃣ Upsert climbs
     const { error: insertError } = await supabase
       .from("climbs")
-      .upsert(mappedClimbs, { onConflict: ["board_id", "climb_name"] });
+      // .upsert(mappedClimbs, { onConflict: ["board_id", "climb_name"] });
+      .upsert(mappedClimbs, { onConflict: ["id"] });
 
     if (insertError) throw insertError;
 
     return res.json({
       board,
-      total_climbs: climbs.length,
+      total_climbs: data.climb_count,
       inserted_count: mappedClimbs.length,
-      sample: mappedClimbs.slice(0, 5),
+      sample: mappedClimbs.slice(0, 3),
     });
   } catch (err) {
     console.error("❌ syncPublicBoard error:", err.message);
