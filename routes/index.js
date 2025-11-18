@@ -15,7 +15,7 @@ router.use('/climbs', climbRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/attempts', attemptRoutes);
 // router.use('/follows', followRoutes);
-router.use('/import-board', importRoutes)
+router.use('/import-user-board-data', importRoutes)
 // router.use('/public-sync', publicSyncRoutes)
 // router.use('/sync-public', publicSyncRoutes)
 
