@@ -66,23 +66,51 @@ export const getPublicData = async (req, res) => {
     }
 
     // 3️⃣ Map climbs to Supabase schema
+    // const mappedClimbs = climbs.map((c) => ({
+    //   board_id: boardId,
+    //   climb_name: c.climb_name || c.name || "Unnamed climb",
+    //   // update db to add climbID from py res?
+    //   climb_uuid: c.uuid,
+    //   angle: c.angle || null,
+    //   displayed_grade: c.displayed_grade || c.grade || null,
+    //   difficulty: c.difficulty || null,
+    //   is_benchmark: Boolean(c.is_benchmark || false),
+    // }));
     const mappedClimbs = climbs.map((c) => ({
+      id: c.uuid,                     // IMPORTANT
       board_id: boardId,
-      climb_name: c.climb_name || c.name || "Unnamed climb",
-      // update db to add climbID from py res?
-      angle: c.angle || null,
-      displayed_grade: c.displayed_grade || c.grade || null,
-      difficulty: c.difficulty || null,
-      is_benchmark: Boolean(c.is_benchmark || false),
+      climb_name: c.name || "Unnamed climb",
+      angle: c.angle ?? null,
+      displayed_grade: c.displayed_grade ?? null,
+      difficulty: c.difficulty ?? null,
+      is_benchmark: Boolean(c.is_benchmark),
     }));
 
     // 4️⃣ Upsert climbs
-    const { error: insertError } = await supabase
-      .from("climbs")
-      // .upsert(mappedClimbs, { onConflict: ["board_id", "climb_name"] });
-      .upsert(mappedClimbs, { onConflict: ["id"] });
+    // const { error: insertError } = await supabase
+    //   .from("climbs")
+    //   // .upsert(mappedClimbs, { onConflict: ["board_id", "climb_name"] });
+    //   .upsert(mappedClimbs, { onConflict: ["id"] });
 
-    if (insertError) throw insertError;
+    // if (insertError) throw insertError;
+    console.log("Syncing climbs:", mappedClimbs.length);
+    
+    async function upsertClimbsInBatches(upsertClimbs, batchSize = 200) {
+      for (let i = 0; i < upsertClimbs.length; i += batchSize) {
+        const chunk = upsertClimbs.slice(i, i + batchSize);
+
+        const { error } = await supabase
+          .from("climbs")
+          .upsert(chunk, { onConflict: "id" });
+
+        if (error) {
+          console.error("Batch upsert error:", error);
+          throw error;
+        }
+      }
+    }
+    await upsertClimbsInBatches(mappedClimbs);
+
 
     return res.json({
       board,
