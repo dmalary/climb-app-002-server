@@ -65,25 +65,31 @@ export const getPublicData = async (req, res) => {
       boardId = newBoard.id;
     }
 
-    // 3️⃣ Map climbs to Supabase schema
-    // const mappedClimbs = climbs.map((c) => ({
-    //   board_id: boardId,
-    //   climb_name: c.climb_name || c.name || "Unnamed climb",
-    //   // update db to add climbID from py res?
-    //   climb_uuid: c.uuid,
-    //   angle: c.angle || null,
-    //   displayed_grade: c.displayed_grade || c.grade || null,
-    //   difficulty: c.difficulty || null,
-    //   is_benchmark: Boolean(c.is_benchmark || false),
-    // }));
+
+    // climb shape from fast api
+    // {"uuid":"00163801596af1064d549ad75b684539","layout_id":9,"setter_id":33802,"setter_username":"vinsewah","name":"Duroxmanie 2.0","description":"No matching","hsm":3,"edge_left":8,"edge_right":88,"edge_bottom":32,"edge_top":128,"angle":null,"frames_count":1,"frames_pace":0,"frames":"p3r4p29r2p59r1p65r2p75r3p89r2p157r4p158r4","is_draft":0,"is_listed":1,"created_at":"2021-02-16 09:13:28.000000","is_nomatch":1}
+
     const mappedClimbs = climbs.map((c) => ({
       id: c.uuid,                     // IMPORTANT
       board_id: boardId,
       climb_name: c.name || "Unnamed climb",
-      angle: c.angle ?? null,
-      displayed_grade: c.displayed_grade ?? null,
-      difficulty: c.difficulty ?? null,
-      is_benchmark: Boolean(c.is_benchmark),
+      // angle: c.angle ?? null,
+      setter_id: c.setter_id,
+      setter_username: c.setter_username,
+      description: c.description,
+      hsm: c.hsm,
+      edge_left: c.edge_left,
+      edge_right: c.edge_right,
+      edge_bottom: c.edge_bottom,
+      edge_top: c.edge_top,
+      angle: c.angle,
+      frames_count: c.frames_count,
+      frames_pace: c.frames_pace,
+      frames: c.frames,
+      is_draft: c.is_draft,
+      is_listed: c.is_listed,
+      created_at: c.created_at,
+      is_nomatch: c.is_nomatch,
     }));
 
     // 4️⃣ Upsert climbs
