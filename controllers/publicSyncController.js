@@ -71,6 +71,7 @@ export const getPublicData = async (req, res) => {
 
     const mappedClimbs = climbs.map((c) => ({
       id: c.uuid,                     // IMPORTANT
+      uuid: c.uuid,                     // IMPORTANT
       board_id: boardId,
       climb_name: c.name || "Unnamed climb",
       // angle: c.angle ?? null,
