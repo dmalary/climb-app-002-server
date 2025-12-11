@@ -27,7 +27,7 @@ export const getSessionAttempts = async (req, res) => {
       .from("attempts")
       .select("*")
       .eq("session_id", sessionId)
-      .order("timestamp", { ascending: false });
+      .order("date", { ascending: false });
 
     if (error) throw error;
 
