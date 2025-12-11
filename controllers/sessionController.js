@@ -3,37 +3,20 @@ import { supabase } from "../config/supabaseClient.js";
 // GET all users
 export const getAllSessions = async (req, res) => {
   try {
-    const { data, error } = await supabase.from("sessions").select("*");
+    const { data, error } = await supabase
+      .from("sessions")
+      .select("*")
+      .order("date", { ascending: false });
 
     if (error) throw error;
 
-    console.log("data", data.length > 1);
-    return res.status(200).json(data);
+    return res.status(200).json(data || []);
   } catch (err) {
-    console.error("Error fetching users:", err.message);
+    console.error("Error fetching sessions:", err.message);
     return res.status(500).json({ error: err.message });
   }
 };
 
-// export const getUserSessions = async (req, res) => {
-//   const { userId } = req.params;
-
-//   try {
-//     if (!userId) {
-//       return res.status(400).json({ error: "Missing userId" });
-//     }
-
-//     const { data, error } = await supabase.from("sessions").select('*').eq('user_id', userId);
-
-//     if (error) throw error;
-
-//     console.log("data", data.length > 1);
-//     return res.status(200).json(data);
-//   } catch (err) {
-//     console.error("Error fetching users:", err.message);
-//     return res.status(500).json({ error: err.message });
-//   }
-// };
 export const getUserSessions = async (req, res) => {
   try {
     // Clerk user from middleware
