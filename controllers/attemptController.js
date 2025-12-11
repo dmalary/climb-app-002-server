@@ -15,6 +15,30 @@ export const getAllAttempts = async (req, res) => {
   }
 };
 
+export const getSessionAttempts = async (req, res) => {
+  const { sessionId } = req.params;
+
+  try {
+    if (!sessionId) {
+      return res.status(400).json({ error: "Missing sessionId" });
+    }
+
+    const { data, error } = await supabase
+      .from("attempts")
+      .select("*")
+      .eq("session_id", sessionId)
+      .order("timestamp", { ascending: false });
+
+    if (error) throw error;
+
+    return res.status(200).json(data);
+  } catch (err) {
+    console.error("Error fetching attempts:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+
 export const getUserSessionAttempts = async (req, res) => {
   const { sessionId } = req.params;
 
