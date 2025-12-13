@@ -1,10 +1,10 @@
 import express from'express';
-import { getAllAttempts, getUserSessionAttempts, getSessionAttempts } from '../controllers/attemptController.js'
+import { getAllAttempts, getUserAttempts, getSessionAttempts } from '../controllers/attemptController.js'
 
 const router = express.Router();
 
 router.get('/', getAllAttempts);
-router.get('/:sessionId', getSessionAttempts)
-// router.get('/:userId', getUserSessionAttempts)
+router.get('/session/:sessionId', getSessionAttempts)
+router.get('/user/:userId', getUserAttempts)
 
 export default router;

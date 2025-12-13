@@ -58,3 +58,41 @@ export const getUserSessionAttempts = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
+export const getUserAttempts = async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    if (!userId) {
+      return res.status(400).json({ error: "Missing userId" });
+    }
+
+    // 1️⃣ Fetch all sessions for this user
+    const { data: sessions, error: sessionError } = await supabase
+      .from("sessions")
+      .select("id")
+      .eq("user_id", userId);
+
+    if (sessionError) throw sessionError;
+
+    if (!sessions || sessions.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    const sessionIds = sessions.map(s => s.id);
+
+    // 2️⃣ Fetch attempts for these sessions
+    const { data: attempts, error: attemptsError } = await supabase
+      .from("attempts")
+      .select("*")
+      .in("session_id", sessionIds)
+      .order("date", { ascending: false });
+
+    if (attemptsError) throw attemptsError;
+
+    return res.status(200).json(attempts);
+  } catch (err) {
+    console.error("Error fetching attempts:", err.message);
+    return res.status(500).json({ error: err.message });
+  }
+};
