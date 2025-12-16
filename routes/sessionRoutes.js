@@ -1,10 +1,11 @@
 import express from'express';
-import { getAllSessions, getUserSessions } from '../controllers/sessionController.js'
+import { getAllSessions, getUserSessions, getSession } from '../controllers/sessionController.js'
 
 const router = express.Router();
 
+router.get('/user/:userId', getUserSessions)
+router.get('/:sessionId', getSession)
 router.get('/', getAllSessions)
-router.get('/:userId', getUserSessions)
 // router.get('/', getUserSessions) // change to getAllSEssions
 
 export default router;

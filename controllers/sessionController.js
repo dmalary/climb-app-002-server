@@ -47,6 +47,38 @@ export const getUserSessions = async (req, res) => {
   }
 };
 
+export const getSession = async (req, res) => {
+  try {
+    // 🔐 Clerk auth
+    const { userId } = req.auth;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    // 🧭 Route param (THIS is the session ID you want)
+    const { sessionId } = req.params;
+    console.log('sessionId', sessionId)
+
+    const { data, error } = await supabase
+      .from("sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .eq("user_id", userId)   // 🔒 scope to owner
+      .single();               // ✅ return one row
+
+    if (error) {
+      console.error("Supabase error:", error);
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    return res.status(200).json(data);
+  } catch (err) {
+    console.error("Error fetching session:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
+
 // app.get('/api/user/sessions/:id', (req, res) => {
 //   const userId = parseInt(req.params.id);
 //   const session = db.sessions.filter(u => u.userId === userId);

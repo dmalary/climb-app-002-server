@@ -3,8 +3,8 @@ import { getAllAttempts, getUserAttempts, getSessionAttempts } from '../controll
 
 const router = express.Router();
 
-router.get('/', getAllAttempts);
-router.get('/session/:sessionId', getSessionAttempts)
 router.get('/user/:userId', getUserAttempts)
+router.get('/:sessionId', getSessionAttempts)
+router.get('/', getAllAttempts);
 
 export default router;

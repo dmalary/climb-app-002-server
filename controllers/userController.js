@@ -7,7 +7,7 @@ export const getAllUsers = async (req, res) => {
 
     if (error) throw error;
 
-    console.log("data", data.length > 1);
+    // console.log("data", data.length > 1);
     return res.status(200).json(data);
   } catch (err) {
     console.error("Error fetching users:", err.message);
@@ -28,7 +28,7 @@ export const getUser = async (req, res) => {
 
     if (error) throw error;
 
-    console.log("data", data.length > 1);
+    // console.log("data", data.length > 1);
     return res.status(200).json(data);
   } catch (err) {
     console.error("Error fetching users:", err.message);
