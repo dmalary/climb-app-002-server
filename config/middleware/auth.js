@@ -1,73 +1,73 @@
 import { supabase } from "../supabaseClient.js";
-import { seedMockData } from "../../lib/mockSeed.js"
+import { clerkClient } from "@clerk/express";
 
 export const syncUser = async (req, res, next) => {
   try {
-    // const { userId, sessionId } = req.auth;
-    const { userId, sessionClaims } = req.auth;
-    // console.log('userId', userId)
+    const { userId } = req.auth;
 
     if (!userId) {
-      return res.status (401).json({ error: "Unauthorized, no user id found" });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
-    // Basic user data from Clerk
-    const email = sessionClaims?.email || "";
-    const username = sessionClaims?.username || "";
-    const safeUsername = username && username.trim() !== ""
-      ? username
-      : `user_${userId.slice(0, 6)}`;
+    // 🔑 Fetch full user from Clerk
+    const clerkUser = await clerkClient.users.getUser(userId);
 
-    // check supabase for user
-    let { data: existingUser, error: findErr } = await supabase
+    const email =
+      clerkUser.emailAddresses?.[0]?.emailAddress || null;
+
+    const username =
+      clerkUser.username ||
+      clerkUser.firstName ||
+      `user_${userId.slice(0, 6)}`;
+
+    // ---------------------------------------
+    // Check Supabase
+    // ---------------------------------------
+    const { data: existingUser, error: findErr } = await supabase
       .from("users")
       .select("*")
-      // .eq("clerk_id", userId)
       .eq("id", userId)
-      .single();
+      .maybeSingle();
 
-    // Ignore "no rows" error
-    if (findErr && findErr.code !== "PGRST116") {
+    if (findErr) {
       console.error("Supabase find user error:", findErr);
-      return res.status(500).json({ error: "Internal error" });
+      return res.status(500).json({ error: "Database error" });
     }
 
+    // ---------------------------------------
+    // Insert if missing
+    // ---------------------------------------
     if (!existingUser) {
-      const { data: newUser, error: upsertErr } = await supabase
+      const { data: newUser, error: insertErr } = await supabase
         .from("users")
-        // .insert({ clerk_id: userId })
-        // .insert({ id: userId })
-        // .insert({
-        //   id: userId,
-        //   email,
-        //   username,
-        //   created_at: new Date().toISOString()
-        // })
-        .upsert({
-            id: userId,
-            email,
-            // username: username || `user_${userId.slice(0, 6)}`,
-            username: safeUsername,
-            created_at: new Date().toISOString(),
-          },
-          { onConflict: "id" }   // ✅ ensures it overwrites based on id, not username
-        )
+        .insert({
+          id: userId,       // Clerk user ID
+          email,
+          username,
+          created_at: new Date().toISOString(),
+        })
         .select("*")
         .single();
 
-      if (upsertErr) {
-        console.error("Supabase upsert user error:", upsertErr);
-        return res.status(500).json({ error: "Could not create user" });
+      if (insertErr) {
+        console.error("Supabase insert user error:", insertErr);
+        return res.status(500).json({ error: "User creation failed" });
       }
-      existingUser = newUser;
 
-      // await seedMockData(userId, supabase);
+      req.user = newUser;
+    } else {
+      // Keep Supabase in sync
+      await supabase
+        .from("users")
+        .update({ email, username })
+        .eq("id", userId);
+
+      req.user = existingUser;
     }
 
-    req.user = existingUser;
     next();
   } catch (err) {
-    console.log('syncUser error:', err);
-    res.status(500).json({error: 'internal error' })
+    console.error("syncUser error:", err);
+    res.status(500).json({ error: "Auth sync failed" });
   }
-}
+};
