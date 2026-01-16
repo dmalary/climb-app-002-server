@@ -8,64 +8,83 @@ export const getUserBoardData = async (req, res) => {
   try {
     const { board, username, password } = req.body;
 
-    if (!board || !username || !password) {
+    if (!board || !username) {
       return res.status(400).json({
-        error: "Missing required fields: board, username, password",
+        error: "Missing required fields: board, username",
       });
     }
 
     // ----------------------------------------------------
-    // Ensure local cached DB exists
-    // Node no longer builds DB — FastAPI handles it
-    // ----------------------------------------------------
-    const localDbPath = await ensureLocalBoardDB(board);
-
-    // ----------------------------------------------------
-    // Verify FastAPI service URL
+    // Validate FastAPI service URL
     // ----------------------------------------------------
     const PY_LIB_URL = process.env.PY_LIB_URL;
     if (!PY_LIB_URL) throw new Error("PY_LIB_URL not set");
+
+    // ----------------------------------------------------
+    // Ensure a LOGBOOK-CAPABLE DB exists
+    // FastAPI is now the authority
+    // ----------------------------------------------------
+    // const localDbPath = await ensureLocalBoardDB({
+    //   board,
+    //   require: "logbook",
+    //   username,
+    //   password,
+    // });
+
+    // if (!localDbPath) {
+    //   throw new Error("Failed to resolve local board DB path");
+    // }
 
     // ----------------------------------------------------
     // Request user logbook from FastAPI
     // ----------------------------------------------------
     console.log("📡 Requesting user logbook from FastAPI…");
 
-    const logRes = await axios.post(`${PY_LIB_URL}/fetch-user-board-data`, {
-      board,
-      username,
-      password,
-      database_path: localDbPath,
-    });
+    const logRes = await axios.post(
+      `${PY_LIB_URL}/fetch-user-board-data`,
+      {
+        board,
+        username,
+        password,
+        // database_path: localDbPath,
+      },
+      { timeout: 60_000 }
+    );
 
-    const attempts = logRes.data?.logbook;
-    if (!Array.isArray(attempts) || !attempts.length) {
-      throw new Error("No session data returned from FastAPI");
+    // const attempts = logRes.data?.logbook;
+    const attempts = logRes.data?.entries;
+
+    if (!Array.isArray(attempts) || attempts.length === 0) {
+      throw new Error("No logbook data returned from FastAPI");
     }
 
-    console.log("🧠 Sesh length:", attempts.length);
-    console.log("🧠 Session Sample:", attempts.slice(0, 3));
+    console.log("🧠 Attempts received:", attempts.length);
+    console.log("🧠 Sample attempt:", attempts[0]);
 
-    const userId = req.auth?.userId || null;
+    const userId = req.auth?.userId ?? null;
 
     // ----------------------------------------------------
     // Ensure board exists in Supabase
     // ----------------------------------------------------
-    let { data: existingBoards } = await supabase
+    const { data: existingBoards } = await supabase
       .from("boards")
       .select("id")
-      .eq("name", board);
+      .eq("name", board)
+      .limit(1);
 
     let boardId;
+
     if (existingBoards?.length) {
       boardId = existingBoards[0].id;
     } else {
-      const { data: newBoard, error: boardError } = await supabase
+      const { data: newBoard, error } = await supabase
         .from("boards")
         .insert([{ name: board }])
         .select("id")
         .single();
-      if (boardError) throw new Error(boardError.message);
+        // .mayBeSingle();
+
+      if (error) throw new Error(error.message);
       boardId = newBoard.id;
     }
 
@@ -75,13 +94,15 @@ export const getUserBoardData = async (req, res) => {
     const sessionsMap = new Map();
 
     attempts.forEach((a) => {
-      const dateOnly = a.date.split(" ")[0]; // '2023-07-31'
+      if (!a.date) return;
+
+      const dateOnly = a.date.split(" ")[0];
       const key = `${board}_${dateOnly}`;
 
       if (!sessionsMap.has(key)) {
         sessionsMap.set(key, {
           board,
-          date: new Date(dateOnly + "T00:00:00Z"), // ensure Date object
+          date: new Date(`${dateOnly}T00:00:00Z`),
           attempts: [],
         });
       }
@@ -90,42 +111,46 @@ export const getUserBoardData = async (req, res) => {
     });
 
     // ----------------------------------------------------
-    // Insert sessions into Supabase
+    // Insert sessions
     // ----------------------------------------------------
     const sessionRows = Array.from(sessionsMap.values()).map((s) => ({
       user_id: userId,
       board_id: boardId,
-      date: s.date,
+      board_name: board,
+      // date: s.date,
+      date: s.date.toISOString().split("T")[0],
     }));
 
-    const { data: insertedSessions, error: sessionError } = await supabase
+    const { data: upsertedSessions, error: sessionError } = await supabase
       .from("sessions")
-      .insert(sessionRows)
-      .select("id, date");
+      .upsert(sessionRows, {
+        onConflict: "user_id, board_name, date"
+      })
+      .select("id, board_name, date");
 
     if (sessionError) throw new Error(sessionError.message);
 
-    // Map YYYY-MM-DD => sessionId
+    // Map YYYY-MM-DD → sessionId
     const sessionIdMap = new Map();
-    insertedSessions.forEach((s) => {
-      const dateKey = new Date(s.date).toISOString().split("T")[0]; // convert to YYYY-MM-DD
-      const key = `${board}_${dateKey}`;
-      sessionIdMap.set(key, s.id);
+    upsertedSessions.forEach((s) => {
+      const dateKey = new Date(s.date).toISOString().split("T")[0];
+      sessionIdMap.set(`${s.board_name}_${dateKey}`, s.id);
     });
 
     // ----------------------------------------------------
-    // Insert attempts with correct session ID
+    // Insert attempts
     // ----------------------------------------------------
     let attemptCount = 0;
 
-    for (const [key, s] of sessionsMap.entries()) {
+    for (const [key, session] of sessionsMap.entries()) {
       const sessionId = sessionIdMap.get(key);
       if (!sessionId) continue;
 
-      const attemptRows = s.attempts.map((a) => ({
+      const attemptRows = session.attempts.map((a) => ({
         session_id: sessionId,
+        board_attempt_id: a.board_attempt_id,
         board: a.board,
-        angle: parseInt(a.angle, 10),
+        angle: a.angle ? parseInt(a.angle, 10) : null,
         climb_name: a.climb_name,
         date: new Date(a.date),
         logged_grade: a.logged_grade || null,
@@ -140,27 +165,30 @@ export const getUserBoardData = async (req, res) => {
         comment: a.comment || null,
       }));
 
-      const { error: attemptError } = await supabase
+      const { error } = await supabase
         .from("attempts")
-        .insert(attemptRows);
+        .upsert(attemptRows, {
+          onConflict: "session_id, board_attempt_id"
+        });
 
-      if (!attemptError) attemptCount += attemptRows.length;
-      else console.error("❌ Attempt insert error:", attemptError.message);
+      if (!error) attemptCount += attemptRows.length;
+      else console.error("❌ Attempt insert error:", error.message);
     }
 
     // ----------------------------------------------------
-    // Respond success
+    // Success
     // ----------------------------------------------------
     res.status(200).json({
-      message: "Board data imported successfully.",
+      message: "Board data imported successfully",
       board,
-      total_sessions: insertedSessions.length,
+      total_sessions: upsertedSessions.length,
       inserted_attempts: attemptCount,
-    });
+    } || []);
 
   } catch (err) {
-    console.error("❌ User import error:", err.message);
-    return res.status(500).json({
+    console.error("❌ User import error:", err);
+
+    res.status(500).json({
       error: "Failed to import board data",
       details: err.response?.data ?? err.message,
     });
