@@ -1,12 +1,12 @@
 import axios from "axios";
 import { supabase } from "../config/supabaseClient.js";
-import { ensureLocalBoardDB } from "../services/boardDatabaseService.js";
+// import { ensureLocalBoardDB } from "../services/boardDatabaseService.js";
 
 export const getUserBoardData = async (req, res) => {
   console.log("🛰️ Express: /api/import-user-board-data hit");
 
   try {
-    const { board, username, password } = req.body;
+    const { board, username, password, appSession } = req.body;
 
     if (!board || !username) {
       return res.status(400).json({
@@ -46,6 +46,7 @@ export const getUserBoardData = async (req, res) => {
         board,
         username,
         password,
+        appSession
         // database_path: localDbPath,
       },
       { timeout: 60_000 }
