@@ -6,7 +6,7 @@ import cors from "cors";
 import { clerkMiddleware, requireAuth } from '@clerk/express';
 import mainRouter from './routes/index.js';
 import publicSyncRoutes from './routes/publicSyncRoutes.js';
-import { syncUser } from './config/middleware/auth.js';
+import { ensureUser } from './config/middleware/auth.js';
 
 const app = express();
 
@@ -16,12 +16,10 @@ app.use(express.json());
 app.use(clerkMiddleware());
 
 // public data sync
-app.use('/api', publicSyncRoutes);
+// app.use('/api', publicSyncRoutes);
+app.use('/api', requireAuth(), ensureUser, publicSyncRoutes);
 
-// app.use('/api', requireAuth(), mainRouter);
-// app.use('/api', mainRouter);
-// app.use('/api', syncUser, mainRouter);
-app.use('/api', requireAuth(), syncUser, mainRouter);
+app.use('/api', requireAuth(), ensureUser, mainRouter);
 
 // Apply middleware to a specific route
 // app.get('/protected', requireAuth(), (req, res) => {

@@ -2,12 +2,12 @@ import axios from "axios";
 import { supabase } from "../config/supabaseClient.js";
 import { renderImagesInBatches } from "../utils/renderImageInBatches.js"
 
-const IMAGE_BATCH_SIZE = 25;
+const DEFAULT_IMAGE_BATCH_SIZE = 25;
 
 export const getPublicData = async (req, res) => {
   console.log("🛰️ Express: /api/sync-public hit");
 
-  const { board } = req.body;
+  const { board, renderImages = false, maxImages = 200, batchSize } = req.body;
   if (!board) return res.status(400).json({ error: "Missing board name" });
 
   try {
@@ -20,10 +20,11 @@ export const getPublicData = async (req, res) => {
       .eq("user_id", req.auth.userId)
       .limit(1);
 
-    if (!sessions || sessions.length === 0) {
-      console.log("⏭ Skipping public image sync — user has no sessions");
-      return next();
-    }
+    // if (!sessions || sessions.length === 0) {
+    //   console.log("⏭ Skipping public image sync — user has no sessions");
+    //   return next();
+    // }
+    const hasSessions = !!(sessions && sessions.length);
 
     // 1️⃣ Fetch public climbs from FastAPI
     const pyRes = await axios.post(`${PY_LIB_URL}/sync-public-data`, { board });
@@ -90,17 +91,45 @@ export const getPublicData = async (req, res) => {
       if (error) throw error;
     }
 
+    // If caller didn’t ask for images (login use-case), return now
+    if (!renderImages) {
+      return res.json({
+        board,
+        total_climbs: climb_count,
+        inserted_count: mappedClimbs.length,
+        images_queued: 0,
+        note: "climbs synced (no image rendering requested)",
+      });
+    }
+
+    // If you want to avoid doing image work for brand-new users:
+    if (!hasSessions) {
+      return res.json({
+        board,
+        total_climbs: climb_count,
+        inserted_count: mappedClimbs.length,
+        images_queued: 0,
+        note: "skipped image rendering because user has no sessions yet",
+      });
+    }
+
     // 5️⃣ Filter climbs that already have images
     const { data: existingImages } = await supabase
       .from("climbs")
       .select("id")
+      .eq("board_id", boardId)
       .not("image_url", "is", null);
 
-    const existingSet = new Set(existingImages.map(c => c.id));
+    const existingSet = new Set((existingImages || []).map((c) => c.id));
 
-    const climbsNeedingImages = mappedClimbs.filter(
+    let climbsNeedingImages = mappedClimbs.filter(
       c => !existingSet.has(c.id)
     );
+
+    // Safety: don’t try to render the entire universe in one request
+    if (typeof maxImages === "number") {
+      climbsNeedingImages = climbsNeedingImages.slice(0, maxImages);
+    }
 
     console.log(
       `🖼 Rendering images for ${climbsNeedingImages.length} climbs`
@@ -111,7 +140,7 @@ export const getPublicData = async (req, res) => {
       climbs: climbsNeedingImages,
       board,
       PY_LIB_URL,
-      batchSize: IMAGE_BATCH_SIZE,
+      batchSize: batchSize || DEFAULT_IMAGE_BATCH_SIZE,
     });
 
     return res.json({

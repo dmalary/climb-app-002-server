@@ -5,6 +5,7 @@ import climbRoutes from './climbRoutes.js';
 import sessionRoutes from './sessionRoutes.js';
 import attemptRoutes from './attemptRoutes.js';
 import importRoutes from './boardImportRoutes.js';
+import imageRoutes from './imageRoutes.js'
 // import publicSyncRoutes from './publicSyncRoutes.js';
 
 const router = express.Router();
@@ -14,8 +15,9 @@ router.use('/boards', boardRoutes);
 router.use('/climbs', climbRoutes);
 router.use('/sessions', sessionRoutes);
 router.use('/attempts', attemptRoutes);
-// router.use('/follows', followRoutes);
 router.use('/import-user-board-data', importRoutes)
+router.use('/images', imageRoutes)
+// router.use('/follows', followRoutes);
 // router.use('/public-sync', publicSyncRoutes)
 // router.use('/sync-public', publicSyncRoutes)
 
