@@ -31,7 +31,7 @@ export async function renderImagesInBatches({
         await supabase
           .from("climbs")
           .update({ image_url })
-          .eq("id", climb.id);
+          .eq("id", climb.id ?? climb.uuid);
       })
     );
 
