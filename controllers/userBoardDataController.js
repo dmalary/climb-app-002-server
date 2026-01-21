@@ -8,9 +8,10 @@ export const getUserBoardData = async (req, res) => {
   try {
     const { board, username, password, appSession } = req.body;
 
-    if (!board || !username) {
+    // if (!board || !username) {
+    if (!board || !username || !password) {
       return res.status(400).json({
-        error: "Missing required fields: board, username",
+        error: "Missing required fields: board, username, password",
       });
     }
 
@@ -147,24 +148,44 @@ export const getUserBoardData = async (req, res) => {
       const sessionId = sessionIdMap.get(key);
       if (!sessionId) continue;
 
-      const attemptRows = session.attempts.map((a) => ({
+      // --- build a deterministic board_attempt_id fallback ---
+      const makeBoardAttemptId = (a) => {
+        const datePart = (a.date || "").split(" ")[0] || "unknown-date";
+        const namePart = a.climb_name || "unknown-climb";
+        const triesTotal = parseInt(a.tries_total, 10) || 1;
+        const sessionsCount = parseInt(a.sessions_count, 10) || 1;
+        return `${datePart}|${namePart}|${triesTotal}|${sessionsCount}`;
+      };
+
+      const attemptRows = session.attempts.map((a) => {
+      const angleInt = a.angle ? parseInt(a.angle, 10) : null;
+      const climbName = a.climb_name?.trim() || null;
+
+      // record key for later climb lookup
+      if (climbName) importedClimbKeys.add(`${angleInt ?? "na"}|${climbName}`);
+
+      return {
         session_id: sessionId,
-        board_attempt_id: a.board_attempt_id,
+        board_attempt_id: a.board_attempt_id || makeBoardAttemptId(a), // ✅ fallback
         board: a.board,
-        angle: a.angle ? parseInt(a.angle, 10) : null,
-        climb_name: a.climb_name,
-        date: new Date(a.date),
+        angle: angleInt,
+        climb_name: climbName,
+        date: a.date ? new Date(a.date) : null,
         logged_grade: a.logged_grade || null,
         displayed_grade: a.displayed_grade || null,
-        is_benchmark: a.is_benchmark === "True",
+        is_benchmark: a.is_benchmark === "True" || a.is_benchmark === true,
         tries: parseInt(a.tries, 10) || 1,
-        is_mirror: a.is_mirror === "True",
+        is_mirror: a.is_mirror === "True" || a.is_mirror === true,
         sessions_count: parseInt(a.sessions_count, 10) || 1,
         tries_total: parseInt(a.tries_total, 10) || 1,
-        is_repeat: a.is_repeat === "True",
-        is_ascent: a.is_ascent === "True",
+        is_repeat: a.is_repeat === "True" || a.is_repeat === true,
+        is_ascent: a.is_ascent === "True" || a.is_ascent === true,
         comment: a.comment || null,
-      }));
+      };
+    });
+
+      // Track unique climbs touched by this import (for image rendering)
+      const importedClimbKeys = new Set(); // `${angle}|${climb_name}`
 
       const { error } = await supabase
         .from("attempts")
@@ -177,6 +198,47 @@ export const getUserBoardData = async (req, res) => {
     }
 
     // ----------------------------------------------------
+    // Resolve imported climbs to climb IDs for image ensuring
+    // (works even if FastAPI does not return climb uuid yet)
+    // ----------------------------------------------------
+    let importedClimbIds = [];
+
+    try {
+      // Ensure public climbs exist for this board (optional but recommended)
+      // You can skip this if you guarantee public sync happens elsewhere
+      // await axios.post(`${PY_LIB_URL}/sync-public-data`, { board }, { timeout: 60_000 });
+
+      // Query climbs for this board by (angle + climb_name)
+      const keys = Array.from(importedClimbKeys).slice(0, 300); // safety cap
+      if (keys.length) {
+        // Build OR filters for PostgREST (Supabase)
+        // Example: or=(and(angle.eq.40,climb_name.eq.Foo),and(angle.is.null,climb_name.eq.Bar))
+        const orParts = keys.map((k) => {
+          const [angleStr, name] = k.split("|");
+          const safeName = name.replaceAll(",", "\\,"); // minimal escaping for or() string
+          if (angleStr === "na") return `and(angle.is.null,climb_name.eq.${safeName})`;
+          return `and(angle.eq.${angleStr},climb_name.eq.${safeName})`;
+        });
+
+        const orFilter = `(${orParts.join(",")})`;
+
+        const { data: climbsFound, error: climbsErr } = await supabase
+          .from("climbs")
+          .select("id")
+          .eq("board_id", boardId)
+          .or(orFilter);
+
+        if (climbsErr) {
+          console.warn("⚠️ Could not resolve climb IDs:", climbsErr.message);
+        } else {
+          importedClimbIds = (climbsFound || []).map((c) => c.id);
+        }
+      }
+    } catch (e) {
+      console.warn("⚠️ Resolve climbs step failed:", e.message);
+    }
+
+    // ----------------------------------------------------
     // Success
     // ----------------------------------------------------
     res.status(200).json({
@@ -184,6 +246,7 @@ export const getUserBoardData = async (req, res) => {
       board,
       total_sessions: upsertedSessions.length,
       inserted_attempts: attemptCount,
+      imported_climb_ids: importedClimbIds,
     } || []);
 
   } catch (err) {
