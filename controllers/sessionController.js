@@ -25,8 +25,8 @@ export const getUserSessions = async (req, res) => {
       return res.status(401).json({ error: "Unauthorized: No user ID found" });
     }
 
-    // Optional: Supabase DB user added via syncUser middleware
-    const supaUser = req.user; // if you add syncUser middleware earlier
+    // Optional: Supabase DB user added via ensureUser middleware
+    const supaUser = req.user; // if you add ensureUser middleware earlier
 
     // Get data scoped to the logged in user
     const { data, error } = await supabase
@@ -65,6 +65,7 @@ export const getSession = async (req, res) => {
       .eq("id", sessionId)
       .eq("user_id", userId)   // 🔒 scope to owner
       .single();               // ✅ return one row
+      // .mayBeingle();               // ✅ return one row
 
     if (error) {
       console.error("Supabase error:", error);
