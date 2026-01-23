@@ -53,11 +53,30 @@ export const getUserBoardData = async (req, res) => {
       { timeout: 60_000 }
     );
 
+    console.log("🧾 FastAPI keys:", Object.keys(logRes.data || {}));
+    console.log("🧾 FastAPI count:", logRes.data?.count);
+    console.log("🧾 FastAPI sample:", logRes.data?.entries?.[0]);
+
+
     // const attempts = logRes.data?.logbook;
     const attempts = logRes.data?.entries;
 
-    if (!Array.isArray(attempts) || attempts.length === 0) {
-      throw new Error("No logbook data returned from FastAPI");
+    if (!Array.isArray(attempts)) {
+      throw new Error(
+        `FastAPI response missing entries array. Keys: ${Object.keys(logRes.data || {})}`
+      );
+    }
+
+    // ✅ Accept 0 attempts as valid (brand new user / no ascents)
+    if (attempts.length === 0) {
+      return res.status(200).json({
+        message: "No logbook entries found for this user/board (nothing to import)",
+        board,
+        total_sessions: 0,
+        inserted_attempts: 0,
+        imported_climb_ids: [],
+        fastapi: { count: logRes.data?.count ?? 0 },
+      });
     }
 
     console.log("🧠 Attempts received:", attempts.length);
@@ -98,7 +117,7 @@ export const getUserBoardData = async (req, res) => {
     attempts.forEach((a) => {
       if (!a.date) return;
 
-      const dateOnly = a.date.split(" ")[0];
+      const dateOnly = a.date.includes("T") ? a.date.split("T")[0] : a.date.split(" ")[0];
       const key = `${board}_${dateOnly}`;
 
       if (!sessionsMap.has(key)) {
@@ -144,6 +163,9 @@ export const getUserBoardData = async (req, res) => {
     // ----------------------------------------------------
     let attemptCount = 0;
 
+    // Track unique climbs touched by this import (for image rendering)
+    const importedClimbKeys = new Set(); // `${angle}|${climb_name}`
+
     for (const [key, session] of sessionsMap.entries()) {
       const sessionId = sessionIdMap.get(key);
       if (!sessionId) continue;
@@ -160,7 +182,7 @@ export const getUserBoardData = async (req, res) => {
       const attemptRows = session.attempts.map((a) => {
       const angleInt = a.angle ? parseInt(a.angle, 10) : null;
       const climbName = a.climb_name?.trim() || null;
-
+      
       // record key for later climb lookup
       if (climbName) importedClimbKeys.add(`${angleInt ?? "na"}|${climbName}`);
 
@@ -183,9 +205,6 @@ export const getUserBoardData = async (req, res) => {
         comment: a.comment || null,
       };
     });
-
-      // Track unique climbs touched by this import (for image rendering)
-      const importedClimbKeys = new Set(); // `${angle}|${climb_name}`
 
       const { error } = await supabase
         .from("attempts")
